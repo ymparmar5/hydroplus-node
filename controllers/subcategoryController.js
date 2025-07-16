@@ -1,6 +1,8 @@
 const Subcategory = require('../models/Subcategory');
+const path = require('path');
+const fs = require('fs');
 
-exports.createSubcategory = async (req, res) => {
+exports.createSubcategory = async (req, res, next) => {
   try {
     const { name, categoryId } = req.body;
     let photo = req.file ? '/uploads/' + req.file.filename : '';
@@ -11,11 +13,11 @@ exports.createSubcategory = async (req, res) => {
     await subcategory.save();
     res.status(201).json({ success: true, message: 'Subcategory created.', subcategory });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error.', error: err.message });
+    next(err);
   }
 };
 
-exports.getSubcategories = async (req, res) => {
+exports.getSubcategories = async (req, res, next) => {
   try {
     const { categoryId } = req.query;
     let filter = {};
@@ -23,41 +25,52 @@ exports.getSubcategories = async (req, res) => {
     const subcategories = await Subcategory.find(filter);
     res.json({ success: true, subcategories });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error.', error: err.message });
+    next(err);
   }
 };
 
-exports.getSubcategory = async (req, res) => {
+exports.getSubcategory = async (req, res, next) => {
   try {
     const subcategory = await Subcategory.findById(req.params.id);
     if (!subcategory) return res.status(404).json({ success: false, message: 'Subcategory not found.' });
     res.json({ success: true, subcategory });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error.', error: err.message });
+    next(err);
   }
 };
 
-exports.updateSubcategory = async (req, res) => {
+exports.updateSubcategory = async (req, res, next) => {
   try {
     const { name, categoryId } = req.body;
     let update = { name, categoryId };
+    const subcategory = await Subcategory.findById(req.params.id);
+    if (!subcategory) return res.status(404).json({ success: false, message: 'Subcategory not found.' });
     if (req.file) {
+      // Delete old photo if exists
+      if (subcategory.photo) {
+        const oldPath = path.join(__dirname, '..', subcategory.photo);
+        fs.unlink(oldPath, err => {});
+      }
       update.photo = '/uploads/' + req.file.filename;
     }
-    const subcategory = await Subcategory.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!subcategory) return res.status(404).json({ success: false, message: 'Subcategory not found.' });
-    res.json({ success: true, message: 'Subcategory updated.', subcategory });
+    const updatedSubcategory = await Subcategory.findByIdAndUpdate(req.params.id, update, { new: true });
+    res.json({ success: true, message: 'Subcategory updated.', subcategory: updatedSubcategory });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error.', error: err.message });
+    next(err);
   }
 };
 
-exports.deleteSubcategory = async (req, res) => {
+exports.deleteSubcategory = async (req, res, next) => {
   try {
     const subcategory = await Subcategory.findByIdAndDelete(req.params.id);
     if (!subcategory) return res.status(404).json({ success: false, message: 'Subcategory not found.' });
+    // Delete photo if exists
+    if (subcategory.photo) {
+      const photoPath = path.join(__dirname, '..', subcategory.photo);
+      fs.unlink(photoPath, err => {});
+    }
     res.json({ success: true, message: 'Subcategory deleted.' });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error.', error: err.message });
+    next(err);
   }
 }; 
